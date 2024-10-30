@@ -13,7 +13,7 @@ app.use(express.json());
 app.use(express.static("public"));
 
 // Inicializa el cliente personal
-const clientPersonal = botPersonal(io);
+//const clientPersonal = botPersonal(io);
 // Inicializa el bot de grupo
 const clientGrupo = botGrupo(io);
 
@@ -26,16 +26,16 @@ io.on("connection", (socket) => {
   // Solicitar datos iniciales
   socket.on("requestData", async () => {
     socket.emit("initialData", {
-      botPersonalActive: botPersonal.isActive(),
+      //botPersonalActive: botPersonal.isActive(),
       botGrupoActive: botGrupo.isActive(),
-      qrP: botPersonal.getCurrentQr(),
+      //qrP: botPersonal.getCurrentQr(),
       qrG: botGrupo.getCurrentQr(),
     });
 
     // Emitir QR si está disponible
-    if (!botPersonal.isActive()) {
-      socket.emit("qr", botPersonal.getCurrentQr());
-    }
+    //if (!botPersonal.isActive()) {
+    //  socket.emit("qr", botPersonal.getCurrentQr());
+    //}
     if (!botGrupo.isActive()) {
       socket.emit("qrBot", botGrupo.getCurrentQr());
     }
