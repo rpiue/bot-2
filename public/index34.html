@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Bots</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+
+    <style>
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+
+
+        .box {
+            background-color: #1f1f1f;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            margin-bottom: 20px;
+            padding: 20px;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        .status {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+
+        button {
+            background-color: #6200ea;
+            color: #ffffff;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #3700b3;
+        }
+
+        .qr-container {
+            text-align: center;
+            margin: 10px 0;
+        }
+
+        .qr-code {
+            width: 200px;
+            /* Tamaño del QR */
+            height: 200px;
+            /* Tamaño del QR */
+            margin: 10px auto;
+            border: 1px solid #333;
+            /* Borde alrededor del QR */
+            border-radius: 8px;
+            background-color: #ffffff;
+        }
+
+        input[type="text"]:focus,
+        input[type="file"]:focus {
+            border-color: rgba(0, 252, 0, 0.397);
+            /* Cambia a verde */
+            box-shadow: 0 0 5px rgb(0, 255, 0);
+            /* Añade un ligero efecto de sombra si lo deseas */
+        }
+
+        .tarjeta {
+            border-radius: 10px;
+            background: #121212;
+            padding: 15px;
+        }
+    </style>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const iconP = document.getElementById('statusP');
+        const iconG = document.getElementById('statusG');
+        const socket = io();
+
+        // Función para generar el código QR
+        function generateQRCode(elementId, qrData, qr, funcion = null) {
+            const qrCodeElement = document.getElementById(elementId);
+            if (!qrCodeElement) return;  // Verifica si el elemento existe
+            if (qr) {
+                qrCodeElement.innerHTML = '';  // Limpia el contenido anterior
+                const img = document.createElement('img');
+                img.src = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qrData)}&size=250x250`;
+                qrCodeElement.appendChild(img);
+            } else {
+                qrCodeElement.innerHTML = '';
+                const button = document.createElement('button');
+                button.textContent = 'Apagar';
+                button.onclick = funcion; // Asignar la función de apagado al botón
+                qrCodeElement.appendChild(button);
+            }
+        }
+
+        socket.on("initialData", (data) => {
+            // Verifica que los elementos del DOM existen
+            const iconP = document.getElementById('statusP');
+            const iconG = document.getElementById('statusG');
+            if (iconP) {
+                if (data.botPersonalActive) {
+                    iconP.style.color = 'lime';
+                    generateQRCode('qrPersonal', '', false, toggleBotPersonal);
+
+                } else {
+                    iconP.style.color = 'red';
+                    // Genera QR para bot personal si está inactivo
+                    generateQRCode('qrPersonal', data.qrP, true);
+                }
+            }
+
+            if (iconG) {
+                if (data.botGrupoActive) {
+                    iconG.style.color = 'lime';
+                    generateQRCode('qrGrupo', '', false, toggleBotGrupo);  // Cambiado data.qrP por data.qrG para el bot de grupo
+
+                } else {
+                    iconG.style.color = 'red';
+                    // Genera QR para bot de grupo si está inactivo
+                    generateQRCode('qrGrupo', data.qrG, true);  // Cambiado data.qrP por data.qrG para el bot de grupo
+                }
+            }
+
+            // Mostrar la data en formato JSON en el elemento con ID "data"
+            //const dataElement = document.getElementById("data");
+            //if (dataElement) {
+            //    dataElement.innerText = JSON.stringify(data, null, 2);
+            //}
+        });
+
+        socket.on("qr", (qr) => {
+            if (iconP) {
+                iconP.style.color = 'red';
+            }
+            generateQRCode('qrPersonal', qr, true);  // Genera el QR para bot personal
+
+        });
+        socket.on("qrBot", (qr) => {
+
+            if (iconG) {
+                iconG.style.color = 'red';
+            } generateQRCode('qrGrupo', qr, true);  // Genera el QR para bot de grupo
+        });
+        socket.on('ready', () => {
+            const iconP = document.getElementById('statusP');
+            iconP.style.color = 'lime';
+            generateQRCode('qrPersonal', '', false, toggleBotPersonal);
+            const btnD = document.getElementById('botGrup');
+            btnD.classList.remove('btn-danger');
+            btnD.classList.add('btn-success');
+            btnD.innerHTML = '<b>ACTIVAR</b>';
+        });
+
+        socket.on('readyBot', () => {
+            const iconG = document.getElementById('statusG');
+            iconG.style.color = 'lime';
+            generateQRCode('qrGrupo', '', false, toggleBotGrupo);
+        });
+
+
+        socket.on("grupoData", (grupos) => {
+            console.log('Tipo de grupos:', typeof grupos);
+            console.log('Contenido de grupos:', grupos);
+            console.log('¿Es un array?', Array.isArray(grupos));
+
+            console.error('Error: grupos no es un array', grupos);
+            const container = document.getElementById('groupContainer');
+            container.innerHTML = ''; // Limpiar contenido anterior
+
+            grupos.forEach(grupo => {
+                const groupDiv = document.createElement('div');
+                groupDiv.classList.add('group-container');
+
+                // Título con el nombre del grupo
+                const groupName = document.createElement('h3');
+                groupName.classList.add('group-name');
+                groupName.textContent = `Grupo: ${grupo.groupName} (${grupo.totalParticipantes}) `;
+
+                // Crear el botón de "Descargar"
+                const downloadButton = document.createElement('button');
+                downloadButton.textContent = 'Descargar';
+                downloadButton.classList.add('download-button');
+
+                // Variable para almacenar todos los números de los participantes
+                let allNumbers = '';
+
+                // Lista de participantes
+                const participantList = document.createElement('ul');
+                grupo.participantes.forEach(participant => {
+                    const participantItem = document.createElement('li');
+                    participantItem.classList.add('participant');
+                    //participantItem.textContent = `Número: ${participant.number}`;
+                    //participantList.appendChild(participantItem);
+
+                    // Acumular los números en allNumbers, separados por un salto de línea
+                    allNumbers += `${participant.number}\n`;
+                });
+
+                // Función para descargar los números de teléfono en un archivo .txt
+                downloadButton.addEventListener('click', () => {
+                    if (!allNumbers || allNumbers.trim() === "") {
+                        alert("Error: No hay datos para descargar.");
+                        return;
+                    }
+
+                    const nombreArchivo = `${grupo.groupName}_participantes.txt`;
+                    descargarArchivo(nombreArchivo, allNumbers);
+                });
+
+                function descargarArchivo(nombreArchivo, contenido) {
+                    // Convertir el contenido a UTF-8 para garantizar la compatibilidad y evitar caracteres raros
+                    const contenidoUTF8 = new TextEncoder().encode(contenido);
+                    const blob = new Blob([contenidoUTF8], { type: 'text/plain;charset=utf-8' });
+
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = nombreArchivo;
+
+                    // Para asegurar la compatibilidad, agregar y quitar el link del DOM
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                    // Liberar el objeto URL después de su uso
+                    URL.revokeObjectURL(link.href);
+                }
+                // Agregar el botón de "Descargar" junto al nombre del grupo
+                groupName.appendChild(downloadButton);
+
+                groupDiv.appendChild(groupName);
+                groupDiv.appendChild(participantList);
+                container.appendChild(groupDiv);
+            });
+        });
+
+
+
+
+
+        socket.on("gruposDisponibles", (grupos) => {
+            document.getElementById("grupos-container").style.display = 'block'
+            const gruposList = document.getElementById("grupos-list");
+            gruposList.innerHTML = ""; // Limpiar la lista actual
+
+            // Agregar los grupos a la lista
+            grupos.forEach(grupo => {
+                const li = document.createElement("li");
+                li.innerHTML = `<label><input type="checkbox" value="${grupo.id}"> ${grupo.name}</label>`; // Checkbox para cada grupo
+                gruposList.appendChild(li);
+            });
+        });
+        document.addEventListener("DOMContentLoaded", () => {
+            document.getElementById("activar-grupos").addEventListener("click", () => {
+                const selectedGrupos = Array.from(document.querySelectorAll('#grupos-form input[type="checkbox"]:checked'))
+                    .map(checkbox => checkbox.value); // Obtener los grupos seleccionados
+
+                if (selectedGrupos.length > 0) {
+                    document.getElementById("data").innerHTML = selectedGrupos
+                    console.log("Grupos seleccionados:", selectedGrupos);
+                    // Aquí podrías emitir un evento para activar los grupos seleccionados
+                    socket.emit("selectGrupos", selectedGrupos); // Enviar grupos seleccionados al servidor
+                } else {
+                    alert("Por favor, selecciona al menos un grupo.");
+                }
+            });
+
+
+            document.getElementById("welcomeForm").addEventListener("submit", (event) => {
+                event.preventDefault();
+                const imageUrl = document.getElementById("imageUrl").value;
+                const message = document.getElementById("message").value;
+
+                // Envía los datos al servidor
+                socket.emit("sendWelcome", { imageUrl, message });
+            });
+        });
+        socket.on("welcomeStatus", (status) => {
+            alert(status.message);
+        });
+
+        function toggleBotPersonal() {
+            socket.emit("toggleBotPersonal"); // Emitir el evento para alternar el bot personal
+            // Escuchar la respuesta del servidor para actualizar el estado
+            socket.on("botPersonalStatus", (isActive) => {
+                const iconP = document.getElementById('statusP');
+                if (isActive) {
+                    iconP.style.color = 'lime'; // Cambiar a verde si está activo
+                    alert("El bot personal está activo.");
+                } else {
+                    iconP.style.color = 'red'; // Cambiar a rojo si está inactivo
+                    alert("El bot personal está inactivo.");
+                }
+            });
+        }
+
+
+
+
+        function toggleBotGrupo() {
+            socket.emit("toggleBotGrupo"); // Emitir el evento para alternar el bot de grupo
+            // Escuchar la respuesta del servidor para actualizar el estado
+            socket.on("botGrupoStatus", (isActive) => {
+                const iconG = document.getElementById('statusG');
+                if (isActive) {
+                    iconG.style.color = 'lime'; // Cambiar a verde si está activo
+                    alert("El bot de grupo está activo.");
+                } else {
+                    iconG.style.color = 'red'; // Cambiar a rojo si está inactivo
+                    alert("El bot de grupo está inactivo.");
+                }
+            });
+        }
+
+
+        // Solicitar datos iniciales al cargar la página
+        window.onload = () => {
+            socket.emit("requestData");
+        };
+    </script>
+
+</head>
+
+<body>
+    <h1>Control de Bots de WhatsApp</h1>
+    <div class="container">
+        <div class="row">
+
+
+            <div class="col-sm-auto">
+                <div class="box">
+                    <h2 class="h3">Bot Personal <svg id="statusP" xmlns="http://www.w3.org/2000/svg" width="16"
+                            height="16" fill="currentColor" class="bi bi-circle-fill" viewBox="0 0 16 16">
+                            <circle cx="8" cy="8" r="8" />
+                        </svg></h2>
+                    <div class="qr-container" id="qrPersonal">
+                        <!-- Aquí se mostrará el QR del bot personal -->
+                        <div class="form-container" style=" text-align: left;">
+                            <h5>Configuraciones</h5>
+                            <div class="mb-3">
+                                <label for="exampleFormControlInput1" class="form-label">URL de la imagen:</label>
+                                <input type="text" id="imageUrlP" class="form-control"
+                                    placeholder="Ingresa la URL de la imagen">
+                            </div>
+                            <div class="button-group m-2">
+                                <button id="setImageUrl" class="p-2">Establecer URL de la Imagen</button>
+                                <button id="toggleEnvio" class="p-2">Activar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            <div class="col-auto">
+                <div class="box">
+
+
+                    <h2 class="h3">Bot de Grupo <svg id="statusG" xmlns="http://www.w3.org/2000/svg" width="16"
+                            height="16" fill="currentColor" class="bi bi-circle-fill" viewBox="0 0 16 16">
+                            <circle cx="8" cy="8" r="8" />
+                        </svg></h2>
+                    <div id="grupos-container" style="display: none;">
+
+                        <div class="row m-1">
+                            <div class="tarjeta col-lg-auto m-2">
+                                <h2>Grupos Disponibles</h2>
+                                <form id="grupos-form">
+                                    <ul id="grupos-list"></ul> <!-- Aquí se mostrarán los grupos -->
+                                    <button type="button" id="activar-grupos">Espiar </button>
+                                </form>
+                            </div>
+
+                            <div id="grupos-container3" class="tarjeta col-lg-auto m-2">
+                                    <form id="welcomeForm">
+                                        <h2 class="h4">Config Grup Spam</h2>
+                                        <label for="url">URL de la IMG:</label>
+                                        <input type="text" id="imageUrl" class="form-control mb-4" required
+                                            placeholder="Ingresa la URL de la img" />
+                                        <label for="url">Texto:</label>
+                                        <textarea class="form-control" id="message"></textarea>
+
+
+                                        <!-- Aquí se mostrarán los grupos -->
+                                        <button type="submit" id="activar-grupos3">+ Añadir </button>
+                                    </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="qr-container" id="qrGrupo">
+                        <!-- Aquí se mostrará el QR del bot de grupo -->
+
+                    </div>
+                </div>
+            </div>
+            <div class="container">
+                <div id="groupContainer">
+                    <!-- Aquí se agregarán dinámicamente los grupos y sus participantes -->
+                </div>
+            </div>
+        </div>
+        <div class="container">
+            <p id="data"></p>
+
+        </div>
+    </div>
+
+</body>
+
+</html>
